@@ -17,7 +17,6 @@ import type { ImageViewerRef } from './ImageViewer';
 // Custom hooks
 import { useImageViewControls } from '@/hooks/useImageViewControls';
 import { useSlideshow } from '@/hooks/useSlideshow';
-import { useFavorites } from '@/hooks/useFavorites';
 import { useKeyboardNavigation } from '@/hooks/useKeyboardNavigation';
 import { useToggleFav } from '../../hooks/useToggleFav';
 import { useLocation } from 'react-router';
@@ -115,7 +114,7 @@ export function MediaView({
   }, []);
 
   // Hooks that depend on currentImage but always declared
-  const handleToggleFavorite = useCallback(() => {
+  const handleToggleFavourite = useCallback(() => {
     if (currentImage) {
       setIsfav((prev) => !prev);
       handle_favourite_toggle();
@@ -217,7 +216,6 @@ export function MediaView({
           currentIndex={currentViewIndex}
           showThumbnails={showThumbnails}
           onThumbnailClick={handleThumbnailClick}
-          favorites={favorites}
           type={type}
         />
       </div>
