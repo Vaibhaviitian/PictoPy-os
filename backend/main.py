@@ -5,7 +5,9 @@ This module contains the main FastAPI application.
 import multiprocessing
 import os
 import json
+import asyncio
 
+from app.config.settings import DATABASE_PATH, THUMBNAIL_IMAGES_PATH
 from uvicorn import Config, Server
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -19,14 +21,32 @@ from app.database.albums import db_create_albums_table
 from app.database.albums import db_create_album_images_table
 from app.database.folders import db_create_folders_table
 from app.database.metadata import db_create_metadata_table
-from app.utils.microservice import microservice_util_start_sync_service
 
 from app.routes.folders import router as folders_router
 from app.routes.albums import router as albums_router
 from app.routes.images import router as images_router
 from app.routes.face_clusters import router as face_clusters_router
 from app.routes.user_preferences import router as user_preferences_router
+from app.routes.memories import router as memories_router
+from app.routes.shutdown import router as shutdown_router
+from app.routes.models import router as models_router, _cleanup_stale_tasks
 from fastapi.openapi.utils import get_openapi
+from app.logging.setup_logging import (
+    configure_uvicorn_logging,
+    setup_logging,
+    get_logger,
+)
+
+# Set up standard logging first
+setup_logging("backend")
+
+# Configure Uvicorn logging to use our custom formatter
+configure_uvicorn_logging("backend")
+
+path = os.path.dirname(DATABASE_PATH)
+os.makedirs(path, exist_ok=True)
+
+os.makedirs(THUMBNAIL_IMAGES_PATH, exist_ok=True)
 
 
 @asynccontextmanager
@@ -41,13 +61,17 @@ async def lifespan(app: FastAPI):
     db_create_albums_table()
     db_create_album_images_table()
     db_create_metadata_table()
-    microservice_util_start_sync_service()
     # Create ProcessPoolExecutor and attach it to app.state
     app.state.executor = ProcessPoolExecutor(max_workers=1)
+
+    # Start the SSE model download cleanup task
+    cleanup_task = asyncio.create_task(_cleanup_stale_tasks())
 
     try:
         yield
     finally:
+        cleanup_task.cancel()
+        await asyncio.gather(cleanup_task, return_exceptions=True)
         app.state.executor.shutdown(wait=True)
 
 
@@ -61,9 +85,13 @@ app = FastAPI(
         "url": "https://www.postman.com/aossie-pictopy/pictopy/overview",
     },
     servers=[
-        {"url": "http://localhost:8000", "description": "Local Development server"}
+        {"url": "http://localhost:52123", "description": "Local Development server"}
     ],
 )
+
+
+# Initialize logger for this module
+logger = get_logger(__name__)
 
 
 def generate_openapi_json():
@@ -87,9 +115,9 @@ def generate_openapi_json():
 
         with open(openapi_path, "w") as f:
             json.dump(openapi_schema, f, indent=2)
-        print(f"OpenAPI JSON generated at {openapi_path}")
+        logger.info(f"OpenAPI JSON generated at {openapi_path}")
     except Exception as e:
-        print(f"Failed to generate openapi.json: {e}")
+        logger.error(f"Failed to generate openapi.json: {e}")
 
 
 # Add CORS middleware
@@ -117,16 +145,25 @@ app.include_router(
 app.include_router(
     user_preferences_router, prefix="/user-preferences", tags=["User Preferences"]
 )
+app.include_router(
+    memories_router
+)  # Memories router (prefix already defined in router)
+app.include_router(shutdown_router, tags=["Shutdown"])
+app.include_router(models_router, prefix="/models", tags=["Models"])
 
 
 # Entry point for running with: python3 main.py
 if __name__ == "__main__":
     multiprocessing.freeze_support()  # Required for Windows
+    logger = get_logger(__name__)
+    logger.info("Starting PictoPy backend server...")
+
     config = Config(
         app=app,
-        host="0.0.0.0",
-        port=8000,
+        host="localhost",
+        port=52123,
         log_level="info",
+        log_config=None,  # This is crucial - disable Uvicorn's default logging config
     )
     server = Server(config)
     server.run()

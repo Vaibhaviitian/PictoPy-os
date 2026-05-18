@@ -16,7 +16,7 @@ import {
 
 import { getErrorMessage } from '@/lib/utils';
 
-interface BackendRes<T = any> {
+export interface BackendRes<T = any> {
   success: boolean;
   error?: string;
   message?: string;
@@ -50,14 +50,14 @@ export function usePictoMutation<
     {
       ...defaultOptions,
       ...options,
-      onSuccess: (data, variables, context) => {
-        options.onSuccess?.(data, variables, context);
+      onSuccess: (data, variables, context, mutationContext) => {
+        options.onSuccess?.(data, variables, context, mutationContext);
       },
-      onError: (error: any, variables, context) => {
-        options.onError?.(error, variables, context);
+      onError: (error: any, variables, context, mutationContext) => {
+        options.onError?.(error, variables, context, mutationContext);
       },
-      onSettled: (data, error, variables, context) => {
-        options.onSettled?.(data, error, variables, context);
+      onSettled: (data, error, variables, context, mutationContext) => {
+        options.onSettled?.(data, error, variables, context, mutationContext);
 
         if (options.autoInvalidateTags) {
           myQueryClient.invalidateQueries({

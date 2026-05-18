@@ -1,42 +1,7 @@
 import sqlite3
 import bcrypt
-import time
-from contextlib import contextmanager
 from app.config.settings import DATABASE_PATH
-
-
-@contextmanager
-def get_db_connection():
-    """Context manager for database connections with proper error handling and retries"""
-    max_retries = 3
-    retry_delay = 0.1
-
-    for attempt in range(max_retries):
-        try:
-            conn = sqlite3.connect(DATABASE_PATH, timeout=30.0)
-            # Enable WAL mode for better concurrency
-            conn.execute("PRAGMA journal_mode=WAL")
-            # Set busy timeout
-            conn.execute("PRAGMA busy_timeout=30000")
-            # Enable foreign keys
-            conn.execute("PRAGMA foreign_keys=ON")
-
-            try:
-                yield conn
-                conn.commit()
-            except Exception as e:
-                conn.rollback()
-                raise e
-            finally:
-                conn.close()
-            break
-
-        except sqlite3.OperationalError as e:
-            if "database is locked" in str(e).lower() and attempt < max_retries - 1:
-                time.sleep(retry_delay * (2**attempt))  # Exponential backoff
-                continue
-            else:
-                raise e
+from app.database.connection import get_db_connection
 
 
 def db_create_albums_table() -> None:
@@ -204,22 +169,42 @@ def db_get_album_images(album_id: str):
 
 
 def db_add_images_to_album(album_id: str, image_ids: list[str]):
+    """
+    Safely adds images to an album using parameterized queries.
+    Maintains UUID support and uses efficient single queries.
+    """
+    # Validate input type
+    if not isinstance(image_ids, list):
+        raise ValueError("image_ids must be a list of IDs")
+
+    # Remove integer conversion - keep IDs as strings for UUID support
+    sanitized_ids = []
+    for img_id in image_ids:
+        # Basic validation - ensure it's a non-empty string
+        if isinstance(img_id, str) and img_id.strip():
+            sanitized_ids.append(img_id.strip())
+
+    if not sanitized_ids:
+        raise ValueError("No valid image IDs provided")
+
     with get_db_connection() as conn:
         cursor = conn.cursor()
 
-        query = (
-            f"SELECT id FROM images WHERE id IN ({','.join('?' for _ in image_ids)})"
-        )
-        cursor.execute(query, image_ids)
+        # Generate placeholders safely based on list length
+        placeholders = ",".join(["?"] * len(sanitized_ids))
+        query = f"SELECT id FROM images WHERE id IN ({placeholders})"
+        cursor.execute(query, sanitized_ids)  # Pass string IDs directly
         valid_images = [row[0] for row in cursor.fetchall()]
 
-        if valid_images:
-            cursor.executemany(
-                "INSERT OR IGNORE INTO album_images (album_id, image_id) VALUES (?, ?)",
-                [(album_id, img_id) for img_id in valid_images],
-            )
-        else:
+        if not valid_images:
             raise ValueError("None of the provided image IDs exist in the database.")
+
+        # Insert into album_images using executemany
+        cursor.executemany(
+            "INSERT OR IGNORE INTO album_images (album_id, image_id) VALUES (?, ?)",
+            [(album_id, img_id) for img_id in valid_images],
+        )
+        conn.commit()
 
 
 def db_remove_image_from_album(album_id: str, image_id: str):

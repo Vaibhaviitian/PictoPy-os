@@ -1,10 +1,18 @@
+from __future__ import annotations
+
+from enum import Enum
 from pydantic import BaseModel
 from typing import Optional, List, Union
 
 
-# Request Model
-class AddSingleImageRequest(BaseModel):
-    path: str
+class InputType(str, Enum):
+    path = "path"
+    base64 = "base64"
+
+
+class FaceSearchRequest(BaseModel):
+    path: Optional[str] = None
+    base64_data: Optional[str] = None
 
 
 class AddMultipleImagesRequest(BaseModel):

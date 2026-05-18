@@ -1,5 +1,6 @@
 export const ROUTES = {
   AI: 'ai-tagging',
+  FAVOURITES: 'favourites',
   HOME: 'home',
   DASHBOARD: 'dashboard',
   PHOTOS: 'photos',
@@ -7,5 +8,6 @@ export const ROUTES = {
   SETTINGS: 'settings',
   ALBUMS: 'albums',
   MEMORIES: 'memories',
+  MEMORY_DETAIL: 'memories/:memoryId',
   PERSON: 'person/:clusterId',
 };

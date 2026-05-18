@@ -1,63 +1,37 @@
-import { convertFileSrc } from '@tauri-apps/api/core';
-import React from 'react';
+import { useRef, useImperativeHandle, forwardRef } from 'react';
+import { ZoomableImage, ZoomableImageRef } from './ZoomableImage';
 
 interface ImageViewerProps {
   imagePath: string;
   alt: string;
-  scale: number;
-  position: { x: number; y: number };
   rotation: number;
-  isDragging: boolean;
-  onMouseDown: (e: React.MouseEvent) => void;
-  onMouseMove: (e: React.MouseEvent) => void;
-  onMouseUp: () => void;
-  onMouseLeave: () => void;
-  onClick?: (e: React.MouseEvent) => void;
+  resetSignal?: number;
 }
 
-export const ImageViewer: React.FC<ImageViewerProps> = ({
-  imagePath,
-  alt,
-  scale,
-  position,
-  rotation,
-  isDragging,
-  onMouseDown,
-  onMouseMove,
-  onMouseUp,
-  onMouseLeave,
-  onClick,
-}) => {
-  return (
-    <div
-      id="zoomable-image"
-      onClick={onClick}
-      onMouseDown={onMouseDown}
-      onMouseMove={onMouseMove}
-      onMouseUp={onMouseUp}
-      onMouseLeave={onMouseLeave}
-      className="relative flex h-full w-full items-center justify-center overflow-hidden"
-    >
-      <img
-        src={convertFileSrc(imagePath) || '/placeholder.svg'}
+export interface ImageViewerRef {
+  zoomIn: () => void;
+  zoomOut: () => void;
+  reset: () => void;
+}
+
+export const ImageViewer = forwardRef<ImageViewerRef, ImageViewerProps>(
+  ({ imagePath, alt, rotation, resetSignal }, ref) => {
+    const zoomableImageRef = useRef<ZoomableImageRef>(null);
+
+    useImperativeHandle(ref, () => ({
+      zoomIn: () => zoomableImageRef.current?.zoomIn(),
+      zoomOut: () => zoomableImageRef.current?.zoomOut(),
+      reset: () => zoomableImageRef.current?.reset(),
+    }));
+
+    return (
+      <ZoomableImage
+        ref={zoomableImageRef}
+        imagePath={imagePath}
         alt={alt}
-        draggable={false}
-        onError={(e) => {
-          const img = e.target as HTMLImageElement;
-          img.onerror = null;
-          img.src = '/placeholder.svg';
-        }}
-        style={{
-          transform: `translate(${position.x}px, ${position.y}px) scale(${scale}) rotate(${rotation}deg)`,
-          transformOrigin: 'top left', // 👈 important
-          transition: isDragging ? 'none' : 'transform 0.2s ease-in-out',
-          cursor: isDragging ? 'grabbing' : 'grab',
-          maxWidth: '100%',
-          maxHeight: '100%',
-          userSelect: 'none',
-          objectFit: 'contain', // still keeps ratio but no force stretching
-        }}
+        rotation={rotation}
+        resetSignal={resetSignal}
       />
-    </div>
-  );
-};
+    );
+  },
+);

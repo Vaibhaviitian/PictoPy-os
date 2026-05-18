@@ -1,8 +1,30 @@
+import logging
+import os
+from app.config.settings import DATABASE_PATH
 from fastapi import FastAPI
 from uvicorn import Config, Server
 from app.core.lifespan import lifespan
-from app.routes import health, watcher, folders
+from app.routes import health, watcher, folders, shutdown
 from fastapi.middleware.cors import CORSMiddleware
+from app.logging.setup_logging import (
+    get_sync_logger,
+    configure_uvicorn_logging,
+    setup_logging,
+)
+from app.utils.logger_writer import redirect_stdout_stderr
+
+# Set up standard logging
+setup_logging("sync-microservice")
+
+# Configure Uvicorn logging to use our custom formatter
+configure_uvicorn_logging("sync-microservice")
+
+path = os.path.dirname(DATABASE_PATH)
+os.makedirs(path, exist_ok=True)
+# Use the sync-specific logger for this module
+logger = get_sync_logger(__name__)
+
+logger.info("Starting PictoPy Sync Microservice...")
 
 # Create FastAPI app with lifespan management
 app = FastAPI(
@@ -19,11 +41,25 @@ app.add_middleware(
     allow_headers=["*"],
 )
 # Include route modules
-app.include_router(health.router, prefix="/api/v1")
-app.include_router(watcher.router, prefix="/api/v1")
-app.include_router(folders.router, prefix="/api/v1")
+app.include_router(health.router, tags=["Health"])
+app.include_router(watcher.router, prefix="/watcher", tags=["Watcher"])
+app.include_router(folders.router, prefix="/folders", tags=["Folders"])
+app.include_router(shutdown.router, tags=["Shutdown"])
 
 if __name__ == "__main__":
-    config = Config(app=app, host="0.0.0.0", port=8001, log_level="info")
+    logger.info("Starting PictoPy Sync Microservice")
+
+    config = Config(
+        app=app,
+        host="localhost",
+        port=52124,
+        log_level="info",
+        log_config=None,  # Disable uvicorn's default logging config
+    )
     server = Server(config)
-    server.run()
+
+    # Use context manager for safe stdout/stderr redirection
+    with redirect_stdout_stderr(
+        logger, stdout_level=logging.INFO, stderr_level=logging.ERROR
+    ):
+        server.run()

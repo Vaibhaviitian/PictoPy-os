@@ -1,12 +1,12 @@
 import { Input } from '@/components/ui/input';
 import { ThemeSelector } from '@/components/ThemeToggle';
-import { Bell, Search } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { Search } from 'lucide-react';
 import { useDispatch, useSelector } from 'react-redux';
 import { selectAvatar, selectName } from '@/features/onboardingSelectors';
 import { clearSearch } from '@/features/searchSlice';
 import { convertFileSrc } from '@tauri-apps/api/core';
 import { FaceSearchDialog } from '@/components/Dialog/FaceSearchDialog';
+import { Link } from 'react-router';
 
 export function Navbar() {
   const userName = useSelector(selectName);
@@ -21,10 +21,10 @@ export function Navbar() {
     <div className="sticky top-0 z-40 flex h-14 w-full items-center justify-between border-b pr-4 backdrop-blur">
       {/* Logo */}
       <div className="flex w-[256px] items-center justify-center">
-        <a href="/" className="flex items-center space-x-2">
+        <Link to="/" className="flex items-center space-x-2">
           <img src="/128x128.png" width={32} height={32} alt="PictoPy Logo" />
           <span className="text-xl font-bold">PictoPy</span>
-        </a>
+        </Link>
       </div>
 
       {/* Search Bar */}
@@ -34,7 +34,11 @@ export function Navbar() {
           {queryImage && (
             <div className="relative mr-2 ml-2">
               <img
-                src={convertFileSrc(queryImage) || 'photo.png'}
+                src={
+                  queryImage?.startsWith('data:')
+                    ? queryImage
+                    : convertFileSrc(queryImage)
+                }
                 alt="Query"
                 className="h-7 w-7 rounded object-cover"
               />
@@ -42,6 +46,8 @@ export function Navbar() {
                 <button
                   onClick={() => dispatch(clearSearch())}
                   className="absolute -top-1 -right-1 flex h-3 w-3 items-center justify-center rounded-full bg-red-600 text-[10px] leading-none text-white"
+                  title="Close"
+                  aria-label="Close"
                 >
                   ✕
                 </button>
@@ -60,7 +66,11 @@ export function Navbar() {
 
           <FaceSearchDialog />
 
-          <button className="text-muted-foreground hover:bg-accent dark:hover:bg-accent/50 hover:text-foreground mx-1 cursor-pointer rounded-sm p-2">
+          <button
+            className="text-muted-foreground hover:bg-accent dark:hover:bg-accent/50 hover:text-foreground mx-1 cursor-pointer rounded-sm p-2"
+            title="Search"
+            aria-label="Search"
+          >
             <Search className="h-4 w-4" />
           </button>
         </div>
@@ -68,23 +78,18 @@ export function Navbar() {
 
       {/* Right Side */}
       <div className="flex items-center space-x-4">
-        <Button variant="ghost" size="icon" className="relative cursor-pointer">
-          <Bell className="h-5 w-5" />
-          <span className="bg-brand-orange absolute top-1 right-1 h-2 w-2 rounded-full" />
-          <span className="sr-only">Notifications</span>
-        </Button>
         <ThemeSelector />
         <div className="flex items-center space-x-2">
           <span className="hidden text-sm sm:inline-block">
             Welcome <span className="text-muted-foreground">{userName}</span>
           </span>
-          <a href="/settings" className="p-2">
+          <Link to="/settings#account" className="p-2">
             <img
               src={userAvatar || '/photo1.png'}
               className="hover:ring-primary/50 h-8 w-8 cursor-pointer rounded-full transition-all hover:ring-2"
               alt="User avatar"
             />
-          </a>
+          </Link>
         </div>
       </div>
     </div>

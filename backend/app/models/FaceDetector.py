@@ -6,28 +6,32 @@ from app.utils.FaceNet import FaceNet_util_preprocess_image, FaceNet_util_get_mo
 from app.utils.YOLO import YOLO_util_get_model_path
 from app.models.YOLO import YOLO
 from app.database.faces import db_insert_face_embeddings_by_image_id
+from app.logging.setup_logging import get_logger
+
+# Initialize logger
+logger = get_logger(__name__)
 
 
 class FaceDetector:
     def __init__(self):
         self.yolo_detector = YOLO(
             YOLO_util_get_model_path("face"),
-            conf_threshold=0.35,
+            conf_threshold=0.45,
             iou_threshold=0.45,
         )
         self.facenet = FaceNet(FaceNet_util_get_model_path())
         self._initialized = True
-        print("FaceDetector initialized with YOLO and FaceNet models.")
+        logger.info("FaceDetector initialized with YOLO and FaceNet models.")
 
     def detect_faces(self, image_id: str, image_path: str, forSearch: bool = False):
         img = cv2.imread(image_path)
         if img is None:
-            print(f"Failed to load image: {image_path}")
+            logger.error(f"Failed to load image: {image_path}")
             return None
 
         boxes, scores, class_ids = self.yolo_detector(img)
-        print(boxes)
-        print(f"Detected {len(boxes)} faces in image {image_id}.")
+        logger.debug(f"Face detection boxes: {boxes}")
+        logger.info(f"Detected {len(boxes)} faces in image {image_id}.")
 
         processed_faces, embeddings, bboxes, confidences = [], [], [], []
 
